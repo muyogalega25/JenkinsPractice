@@ -6,9 +6,6 @@
 *.tfstate.*
 crash.log
 crash.*.log
-terraform.tfvars
-terraform.tfvars.json
-terraform.tfvars.*
 tfplan
 terraform.exe
 LICENSE.txt
