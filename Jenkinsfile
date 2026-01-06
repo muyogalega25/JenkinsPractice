@@ -15,7 +15,11 @@ pipeline {
         checkout scm
       }
     }
-
+environment {
+        AWS_ACCESS_KEY_ID     = credentials('jenkins-aws-secret-key-id')
+        AWS_SECRET_ACCESS_KEY = credentials('jenkins-aws-secret-access-key')
+    }
+    
     stage('Terraform Init') {
       steps {
         sh 'terraform version'
