@@ -1,0 +1,42 @@
+# =========================
+# Terraform
+# =========================
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+terraform.tfvars
+terraform.tfvars.json
+terraform.tfvars.*
+tfplan
+terraform.exe
+LICENSE.txt
+
+# =========================
+# Sensitive files
+# =========================
+*.pem
+*.key
+*.env
+*.secrets
+
+# =========================
+# Jenkins
+# =========================
+jenkins_home/
+secrets/
+credentials.xml
+
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# =========================
+# Logs
+# =========================
+*.log
