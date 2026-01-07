@@ -85,7 +85,7 @@ pipeline {
         slackSend(
           channel: "#wanderprep-infra-team",
           color: color,
-          message: "Build done by Mike - ${env.JOB_NAME} #${env.BUILD_NUMBER} (ACTION=${params.ACTION}, RESULT=${result}) (<${env.BUILD_URL}|Open>)"
+          message: "Build done by luvy - ${env.JOB_NAME} #${env.BUILD_NUMBER} (ACTION=${params.ACTION}, RESULT=${result}) (<${env.BUILD_URL}|Open>)"
         )
       }
     }
