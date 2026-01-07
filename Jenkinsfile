@@ -28,30 +28,36 @@ pipeline {
 
   stages {
     stage('Git Checkout') {
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
-    // ---- IAM / AWS auth verification (fast fail) ----
-    stage('AWS Identity Check') {
+    stage('Safety Check (protect Jenkins)') {
       steps {
         sh '''
           set -euo pipefail
 
+          # Fail if this repo looks like it manages the Jenkins controller itself.
+          # Adjust patterns to match your Jenkins-controller naming if needed.
+          if grep -R --line-number -E 'aws_instance\\s+"jenkins"|jenkins-al2023-ec2|jenkins-al2023-role|jenkins-al2023-instance-profile' ./*.tf 2>/dev/null; then
+            echo "ERROR: This workspace appears to manage the Jenkins controller resources. Refusing to continue."
+            exit 2
+          fi
+        '''
+      }
+    }
+
+    stage('AWS Identity Check') {
+      steps {
+        sh '''
+          set -euo pipefail
           echo "== AWS CLI version =="
           aws --version
 
           echo "== AWS credential source (debug) =="
-          # Shows whether it is using env vars, shared config, or instance profile
-          aws configure list || true
+          aws configure list
 
           echo "== Caller identity (MUST succeed) =="
-          aws sts get-caller-identity
-
-          echo "== Region check =="
-          aws configure get region || true
-          echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"
+          aws sts get-caller-identity --no-cli-pager
         '''
       }
     }
@@ -85,20 +91,19 @@ pipeline {
             error("Apply blocked: set CONFIRM_APPLY=APPLY to run terraform apply.")
           }
           if (!fileExists('tfplan')) {
-            error("Apply blocked: tfplan not found. Run ACTION=plan or ensure plan stage created tfplan.")
+            error("Apply blocked: tfplan not found. Ensure plan stage created tfplan.")
           }
         }
       }
     }
 
-    // Re-check IAM immediately before doing changes (catches expiring/removed creds)
     stage('AWS Identity Re-Check (pre-apply/destroy)') {
       when { expression { params.ACTION == 'apply' || params.ACTION == 'destroy' } }
       steps {
         sh '''
           set -euo pipefail
-          echo "== Caller identity (pre-change) =="
-          aws sts get-caller-identity
+          echo "== Re-checking caller identity before sensitive action =="
+          aws sts get-caller-identity --no-cli-pager
         '''
       }
     }
