@@ -59,7 +59,7 @@ pipeline {
       steps {
         sh '''
           export AWS_DEFAULT_REGION="$AWS_REGION"
-          terraform apply -input=false -auto-approve tfplan
+          terraform apply -auto-approve tfplan
         '''
       }
     }
@@ -69,7 +69,7 @@ pipeline {
       steps {
         sh '''
           export AWS_DEFAULT_REGION="$AWS_REGION"
-          terraform destroy -input=false -auto-approve
+          terraform destroy -auto-approve
         '''
       }
     }
