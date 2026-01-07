@@ -72,18 +72,23 @@ pipeline {
     success {
       withCredentials([string(credentialsId: 'slack-webhook-url', variable: 'SLACK_WEBHOOK')]) {
         sh '''
-          curl -s -X POST -H 'Content-type: application/json' \
-          --data "{\"text\":\"✅ Jenkins job *${JOB_NAME}* #${BUILD_NUMBER} succeeded. ACTION=${ACTION}\"}" \
-          "$SLACK_WEBHOOK" >/dev/null
+          payload=$(cat <<JSON
+{"text":"✅ Jenkins job *${JOB_NAME}* #${BUILD_NUMBER} succeeded. ACTION=${ACTION}"}
+JSON
+          )
+          curl -s -X POST -H 'Content-type: application/json' --data "$payload" "$SLACK_WEBHOOK" >/dev/null
         '''
       }
     }
+
     failure {
       withCredentials([string(credentialsId: 'slack-webhook-url', variable: 'SLACK_WEBHOOK')]) {
         sh '''
-          curl -s -X POST -H 'Content-type: application/json' \
-          --data "{\"text\":\"❌ Jenkins job *${JOB_NAME}* #${BUILD_NUMBER} FAILED. Check console output.\"}" \
-          "$SLACK_WEBHOOK" >/dev/null
+          payload=$(cat <<JSON
+{"text":"❌ Jenkins job *${JOB_NAME}* #${BUILD_NUMBER} FAILED. ACTION=${ACTION}. Check console output."}
+JSON
+          )
+          curl -s -X POST -H 'Content-type: application/json' --data "$payload" "$SLACK_WEBHOOK" >/dev/null
         '''
       }
     }
