@@ -19,7 +19,9 @@ locals {
 
   common_tags = merge(
     var.tags,
-    { NamePrefix = local.name_prefix }
+    {
+      NamePrefix = local.name_prefix
+    }
   )
 }
 
@@ -125,7 +127,10 @@ resource "aws_security_group" "target" {
 }
 
 # -------------------------
-# IAM Role for Target EC2
+# IAM Role for Target EC2 (Optional)
+# NOTE: This role is for the target instance itself.
+# It does NOT grant Terraform permissions.
+# Keep it minimal unless the target instance needs AWS API access.
 # -------------------------
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
@@ -148,15 +153,13 @@ resource "aws_iam_role" "target_role" {
   })
 }
 
-# PRACTICE ONLY: broad permissions for the TARGET instance
-resource "aws_iam_role_policy_attachment" "target_admin" {
-  role       = aws_iam_role.target_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
-}
-
 resource "aws_iam_instance_profile" "target_instance_profile" {
   name = "${local.name_prefix}-instance-profile"
   role = aws_iam_role.target_role.name
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-instance-profile"
+  })
 }
 
 # -------------------------
@@ -171,8 +174,8 @@ resource "aws_instance" "target" {
 
   iam_instance_profile = aws_iam_instance_profile.target_instance_profile.name
 
-  user_data                   = file("${path.module}/user_data.sh")
-  user_data_replace_on_change  = true
+  user_data                  = file("${path.module}/user_data.sh")
+  user_data_replace_on_change = true
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-ec2"

@@ -22,6 +22,30 @@ variable "key_name" {
   default     = "ec2-jenkins-cicd"
 }
 
+# -------------------------
+# Networking
+# -------------------------
+variable "vpc_cidr" {
+  type        = string
+  description = "CIDR block for the VPC"
+  default     = "10.20.0.0/16"
+}
+
+variable "public_subnet_cidr" {
+  type        = string
+  description = "CIDR block for the public subnet"
+  default     = "10.20.1.0/24"
+}
+
+variable "availability_zone_suffix" {
+  type        = string
+  description = "Availability Zone suffix, e.g. 'a' makes us-east-2a"
+  default     = "a"
+}
+
+# -------------------------
+# Security
+# -------------------------
 variable "ssh_cidr" {
   type        = string
   description = "CIDR allowed to SSH (port 22) to the target instance. Recommended: your_public_ip/32"
@@ -34,12 +58,9 @@ variable "app_cidr" {
   default     = "0.0.0.0/0"
 }
 
-variable "availability_zone_suffix" {
-  type        = string
-  description = "Availability Zone suffix, e.g. 'a' makes us-east-2a"
-  default     = "a"
-}
-
+# -------------------------
+# Tags
+# -------------------------
 variable "tags" {
   type        = map(string)
   description = "Common tags applied to resources"
