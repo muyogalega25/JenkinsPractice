@@ -14,7 +14,7 @@ provider "aws" {
 }
 
 locals {
-  name_prefix = var.project_name
+  name_prefix = var.target_name
   az          = "${var.aws_region}${var.availability_zone_suffix}"
 
   common_tags = merge(
@@ -88,11 +88,11 @@ resource "aws_route_table_association" "public" {
 }
 
 # -------------------------
-# Security Group
+# Security Group (Target)
 # -------------------------
-resource "aws_security_group" "jenkins" {
+resource "aws_security_group" "target" {
   name        = "${local.name_prefix}-sg"
-  description = "Allow SSH and Jenkins UI"
+  description = "Allow SSH and app access"
   vpc_id      = aws_vpc.this.id
 
   ingress {
@@ -104,11 +104,11 @@ resource "aws_security_group" "jenkins" {
   }
 
   ingress {
-    description = "Jenkins UI"
+    description = "App (8080)"
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
-    cidr_blocks = [var.jenkins_cidr]
+    cidr_blocks = [var.app_cidr]
   }
 
   egress {
@@ -125,7 +125,7 @@ resource "aws_security_group" "jenkins" {
 }
 
 # -------------------------
-# IAM Role for Jenkins EC2
+# IAM Role for Target EC2
 # -------------------------
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
@@ -139,7 +139,7 @@ data "aws_iam_policy_document" "ec2_assume_role" {
   }
 }
 
-resource "aws_iam_role" "jenkins_role" {
+resource "aws_iam_role" "target_role" {
   name               = "${local.name_prefix}-role"
   assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
 
@@ -150,33 +150,33 @@ resource "aws_iam_role" "jenkins_role" {
 
 # PRACTICE ONLY: broad permissions
 # IMPORTANT: keep this attachment until after EC2 is destroyed.
-resource "aws_iam_role_policy_attachment" "jenkins_admin" {
-  role       = aws_iam_role.jenkins_role.name
+resource "aws_iam_role_policy_attachment" "target_admin" {
+  role       = aws_iam_role.target_role.name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 
-  # Prevent Terraform from removing its own permissions mid-destroy
-  depends_on = [aws_instance.jenkins]
+  # Prevent Terraform from removing permissions mid-destroy
+  depends_on = [aws_instance.target]
 }
 
-resource "aws_iam_instance_profile" "jenkins_instance_profile" {
+resource "aws_iam_instance_profile" "target_instance_profile" {
   name = "${local.name_prefix}-instance-profile"
-  role = aws_iam_role.jenkins_role.name
+  role = aws_iam_role.target_role.name
 
-  # Prevent Terraform from removing its own profile mid-destroy
-  depends_on = [aws_instance.jenkins]
+  # Prevent Terraform from removing profile mid-destroy
+  depends_on = [aws_instance.target]
 }
 
 # -------------------------
-# EC2 Instance (Jenkins)
+# Target EC2 Instance (Created/Destroyed by Terraform)
 # -------------------------
-resource "aws_instance" "jenkins" {
+resource "aws_instance" "target" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.jenkins.id]
+  vpc_security_group_ids = [aws_security_group.target.id]
   key_name               = var.key_name
 
-  iam_instance_profile = aws_iam_instance_profile.jenkins_instance_profile.name
+  iam_instance_profile = aws_iam_instance_profile.target_instance_profile.name
 
   user_data                  = file("${path.module}/user_data.sh")
   user_data_replace_on_change = true
@@ -185,3 +185,4 @@ resource "aws_instance" "jenkins" {
     Name = "${local.name_prefix}-ec2"
   })
 }
+
