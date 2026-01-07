@@ -196,7 +196,7 @@ resource "aws_instance" "target" {
 
   # OPTIONAL safety net:
   # Uncomment if you want to ensure this resource is never destroyed by accident
-  lifecycle {
-    prevent_destroy = true
-   }
+ # lifecycle {
+  #  prevent_destroy = true
+   #}
 }
