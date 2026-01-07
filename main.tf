@@ -23,9 +23,6 @@ locals {
   )
 }
 
-# -------------------------
-# AMI
-# -------------------------
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -36,9 +33,6 @@ data "aws_ami" "al2023" {
   }
 }
 
-# -------------------------
-# VPC + Networking
-# -------------------------
 resource "aws_vpc" "this" {
   cidr_block           = "10.20.0.0/16"
   enable_dns_hostnames = true
@@ -87,9 +81,6 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# -------------------------
-# Security Group (Target)
-# -------------------------
 resource "aws_security_group" "target" {
   name        = "${local.name_prefix}-sg"
   description = "Allow SSH and app access"
@@ -124,9 +115,6 @@ resource "aws_security_group" "target" {
   })
 }
 
-# -------------------------
-# IAM Role for Target EC2
-# -------------------------
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
     effect  = "Allow"
@@ -148,27 +136,16 @@ resource "aws_iam_role" "target_role" {
   })
 }
 
-# PRACTICE ONLY: broad permissions
-# IMPORTANT: keep this attachment until after EC2 is destroyed.
 resource "aws_iam_role_policy_attachment" "target_admin" {
   role       = aws_iam_role.target_role.name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
-
-  # Prevent Terraform from removing permissions mid-destroy
-  depends_on = [aws_instance.target]
 }
 
 resource "aws_iam_instance_profile" "target_instance_profile" {
   name = "${local.name_prefix}-instance-profile"
   role = aws_iam_role.target_role.name
-
-  # Prevent Terraform from removing profile mid-destroy
-  depends_on = [aws_instance.target]
 }
 
-# -------------------------
-# Target EC2 Instance (Created/Destroyed by Terraform)
-# -------------------------
 resource "aws_instance" "target" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
@@ -185,4 +162,3 @@ resource "aws_instance" "target" {
     Name = "${local.name_prefix}-ec2"
   })
 }
-
