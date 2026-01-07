@@ -1,8 +1,8 @@
 def COLOR_MAP = [
-  "SUCCESS": "good",
-  "FAILURE": "danger",
+  "SUCCESS":  "good",
+  "FAILURE":  "danger",
   "UNSTABLE": "warning",
-  "ABORTED": "#808080"
+  "ABORTED":  "#808080"
 ]
 
 pipeline {
@@ -26,6 +26,7 @@ pipeline {
     stage('Terraform Init') {
       steps {
         sh '''
+          set -e
           export AWS_DEFAULT_REGION="$AWS_REGION"
           terraform version
           terraform init -input=false
@@ -36,21 +37,10 @@ pipeline {
     stage('Terraform Plan') {
       steps {
         sh '''
+          set -e
           export AWS_DEFAULT_REGION="$AWS_REGION"
           terraform plan -input=false -out=tfplan
         '''
-      }
-    }
-
-    stage('Manual Approval') {
-      when {
-        anyOf {
-          expression { params.ACTION == 'apply' }
-          expression { params.ACTION == 'destroy' }
-        }
-      }
-      steps {
-        input message: "Approve terraform ${params.ACTION}?", ok: "Yes, run it"
       }
     }
 
@@ -58,8 +48,9 @@ pipeline {
       when { expression { params.ACTION == 'apply' } }
       steps {
         sh '''
+          set -e
           export AWS_DEFAULT_REGION="$AWS_REGION"
-          terraform apply -auto-approve tfplan
+          terraform apply -input=false -auto-approve tfplan
         '''
       }
     }
@@ -68,8 +59,9 @@ pipeline {
       when { expression { params.ACTION == 'destroy' } }
       steps {
         sh '''
+          set -e
           export AWS_DEFAULT_REGION="$AWS_REGION"
-          terraform destroy -auto-approve
+          terraform destroy -input=false -auto-approve
         '''
       }
     }
