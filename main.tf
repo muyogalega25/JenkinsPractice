@@ -23,6 +23,9 @@ locals {
   )
 }
 
+# -------------------------
+# AMI
+# -------------------------
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -33,8 +36,11 @@ data "aws_ami" "al2023" {
   }
 }
 
+# -------------------------
+# VPC + Networking
+# -------------------------
 resource "aws_vpc" "this" {
-  cidr_block           = "10.20.0.0/16"
+  cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
 
@@ -53,7 +59,7 @@ resource "aws_internet_gateway" "this" {
 
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.this.id
-  cidr_block              = "10.20.1.0/24"
+  cidr_block              = var.public_subnet_cidr
   map_public_ip_on_launch = true
   availability_zone       = local.az
 
@@ -81,6 +87,9 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+# -------------------------
+# Security Group (Target)
+# -------------------------
 resource "aws_security_group" "target" {
   name        = "${local.name_prefix}-sg"
   description = "Allow SSH and app access"
@@ -115,6 +124,9 @@ resource "aws_security_group" "target" {
   })
 }
 
+# -------------------------
+# IAM Role for Target EC2
+# -------------------------
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
     effect  = "Allow"
@@ -136,6 +148,7 @@ resource "aws_iam_role" "target_role" {
   })
 }
 
+# PRACTICE ONLY: broad permissions for the TARGET instance
 resource "aws_iam_role_policy_attachment" "target_admin" {
   role       = aws_iam_role.target_role.name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
@@ -146,6 +159,9 @@ resource "aws_iam_instance_profile" "target_instance_profile" {
   role = aws_iam_role.target_role.name
 }
 
+# -------------------------
+# Target EC2 Instance (created/destroyed by Terraform)
+# -------------------------
 resource "aws_instance" "target" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
@@ -155,8 +171,8 @@ resource "aws_instance" "target" {
 
   iam_instance_profile = aws_iam_instance_profile.target_instance_profile.name
 
-  user_data                  = file("${path.module}/user_data.sh")
-  user_data_replace_on_change = true
+  user_data                   = file("${path.module}/user_data.sh")
+  user_data_replace_on_change  = true
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-ec2"

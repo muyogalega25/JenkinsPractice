@@ -15,7 +15,9 @@ pipeline {
 
   parameters {
     choice(name: 'ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action')
-    string(name: 'CONFIRM_DESTROY', defaultValue: '', description: 'Type DESTROY to confirm terraform destroy')
+
+    string(name: 'CONFIRM_APPLY', defaultValue: '', description: 'Type APPLY to allow terraform apply')
+    string(name: 'CONFIRM_DESTROY', defaultValue: '', description: 'Type DESTROY to allow terraform destroy')
   }
 
   environment {
@@ -25,9 +27,7 @@ pipeline {
 
   stages {
     stage('Git Checkout') {
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
     stage('Terraform Init') {
@@ -52,11 +52,13 @@ pipeline {
       }
     }
 
-    stage('Approve Apply') {
+    stage('Validate Apply Confirmation') {
       when { expression { params.ACTION == 'apply' } }
       steps {
         script {
-          input(message: "Approve Terraform APPLY to create/update resources in AWS?", ok: "Approve Apply")
+          if ((params.CONFIRM_APPLY ?: '').trim() != 'APPLY') {
+            error("Apply blocked: set CONFIRM_APPLY=APPLY to run terraform apply.")
+          }
         }
       }
     }
@@ -83,15 +85,6 @@ pipeline {
       }
     }
 
-    stage('Approve Destroy') {
-      when { expression { params.ACTION == 'destroy' } }
-      steps {
-        script {
-          input(message: "Approve Terraform DESTROY? This will delete AWS resources.", ok: "Approve Destroy")
-        }
-      }
-    }
-
     stage('Terraform Destroy') {
       when { expression { params.ACTION == 'destroy' } }
       steps {
@@ -106,12 +99,6 @@ pipeline {
 
   post {
     always {
-      script {
-        if (fileExists('tfplan')) {
-          archiveArtifacts artifacts: 'tfplan', fingerprint: true, onlyIfSuccessful: false
-        }
-      }
-
       echo 'sending build result!'
       script {
         def result = currentBuild.currentResult ?: "UNKNOWN"
