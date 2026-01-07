@@ -1,13 +1,17 @@
-output "jenkins_public_ip" {
-  value = aws_instance.jenkins.public_ip
+output "target_public_ip" {
+  description = "Public IP of the target EC2 instance"
+  value       = aws_instance.target.public_ip
 }
 
-output "jenkins_url" {
-  value = "http://${aws_instance.jenkins.public_ip}:8080"
+output "target_url" {
+  description = "URL to access the target instance on port 8080"
+  value       = "http://${aws_instance.target.public_ip}:8080"
 }
 
 output "ssh_command" {
-  value = "ssh -i \"C:/Users/galeg/Downloads/ec2-jenkins-cicd.pem\" ec2-user@${aws_instance.jenkins.public_ip}"
+  description = "SSH command (update the pem path on your machine)"
+  value       = "ssh -i \"<PATH_TO_YOUR_PEM_FILE>\" ec2-user@${aws_instance.target.public_ip}"
 }
+
 
 
