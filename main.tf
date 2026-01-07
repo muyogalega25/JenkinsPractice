@@ -13,6 +13,16 @@ provider "aws" {
   region = var.aws_region
 }
 
+locals {
+  name_prefix = var.project_name
+  az          = "${var.aws_region}${var.availability_zone_suffix}"
+
+  common_tags = merge(
+    var.tags,
+    { NamePrefix = local.name_prefix }
+  )
+}
+
 # -------------------------
 # AMI
 # -------------------------
@@ -32,25 +42,38 @@ data "aws_ami" "al2023" {
 resource "aws_vpc" "this" {
   cidr_block           = "10.20.0.0/16"
   enable_dns_hostnames = true
-  tags = { Name = "${var.Jenkins-server2}-vpc" }
+  enable_dns_support   = true
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-vpc"
+  })
 }
 
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
-  tags   = { Name = "${var.Jenkins-server2}-igw" }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-igw"
+  })
 }
 
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.this.id
   cidr_block              = "10.20.1.0/24"
   map_public_ip_on_launch = true
-  availability_zone       = "${var.aws_region}a"
-  tags = { Name = "${var.Jenkins-server2}-public-subnet" }
+  availability_zone       = local.az
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-public-subnet"
+  })
 }
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
-  tags   = { Name = "${var.Jenkins-server2}-public-rt" }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-public-rt"
+  })
 }
 
 resource "aws_route" "default" {
@@ -68,8 +91,8 @@ resource "aws_route_table_association" "public" {
 # Security Group
 # -------------------------
 resource "aws_security_group" "jenkins" {
-  name        = "${var.Jenkins-server2}-sg"
-  description = "Allow SSH and Jenkins"
+  name        = "${local.name_prefix}-sg"
+  description = "Allow SSH and Jenkins UI"
   vpc_id      = aws_vpc.this.id
 
   ingress {
@@ -77,7 +100,7 @@ resource "aws_security_group" "jenkins" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip_cidr]
+    cidr_blocks = [var.ssh_cidr]
   }
 
   ingress {
@@ -96,7 +119,9 @@ resource "aws_security_group" "jenkins" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.Jenkins-server2}-sg" }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-sg"
+  })
 }
 
 # -------------------------
@@ -115,19 +140,30 @@ data "aws_iam_policy_document" "ec2_assume_role" {
 }
 
 resource "aws_iam_role" "jenkins_role" {
-  name               = "${var.Jenkins-server2}-role"
+  name               = "${local.name_prefix}-role"
   assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-role"
+  })
 }
 
-# PRACTICE PURPOSES — broad permissions
+# PRACTICE ONLY: broad permissions
+# IMPORTANT: keep this attachment until after EC2 is destroyed.
 resource "aws_iam_role_policy_attachment" "jenkins_admin" {
   role       = aws_iam_role.jenkins_role.name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+
+  # Prevent Terraform from removing its own permissions mid-destroy
+  depends_on = [aws_instance.jenkins]
 }
 
 resource "aws_iam_instance_profile" "jenkins_instance_profile" {
-  name = "${var.Jenkins-server2}-instance-profile"
+  name = "${local.name_prefix}-instance-profile"
   role = aws_iam_role.jenkins_role.name
+
+  # Prevent Terraform from removing its own profile mid-destroy
+  depends_on = [aws_instance.jenkins]
 }
 
 # -------------------------
@@ -145,5 +181,7 @@ resource "aws_instance" "jenkins" {
   user_data                  = file("${path.module}/user_data.sh")
   user_data_replace_on_change = true
 
-  tags = { Name = "${var.Jenkins-server2}-ec2" }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-ec2"
+  })
 }
