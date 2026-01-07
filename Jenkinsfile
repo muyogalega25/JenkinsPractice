@@ -11,11 +11,11 @@ pipeline {
   options {
     timestamps()
     disableConcurrentBuilds()
+    skipDefaultCheckout(true)
   }
 
   parameters {
     choice(name: 'ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action')
-
     string(name: 'CONFIRM_APPLY', defaultValue: '', description: 'Type APPLY to allow terraform apply')
     string(name: 'CONFIRM_DESTROY', defaultValue: '', description: 'Type DESTROY to allow terraform destroy')
   }
@@ -27,7 +27,9 @@ pipeline {
 
   stages {
     stage('Git Checkout') {
-      steps { checkout scm }
+      steps {
+        checkout scm
+      }
     }
 
     stage('Terraform Init') {
@@ -48,6 +50,7 @@ pipeline {
           set -euo pipefail
           export AWS_DEFAULT_REGION="$AWS_REGION"
           terraform plan -input=false -out=tfplan
+          ls -lah tfplan
         '''
       }
     }
@@ -58,6 +61,9 @@ pipeline {
         script {
           if ((params.CONFIRM_APPLY ?: '').trim() != 'APPLY') {
             error("Apply blocked: set CONFIRM_APPLY=APPLY to run terraform apply.")
+          }
+          if (!fileExists('tfplan')) {
+            error("Apply blocked: tfplan not found. Run ACTION=plan or ensure plan stage created tfplan.")
           }
         }
       }
