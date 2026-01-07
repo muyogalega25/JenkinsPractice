@@ -15,8 +15,6 @@ pipeline {
 
   parameters {
     choice(name: 'ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action')
-
-    // Safety guard for destroy
     string(name: 'CONFIRM_DESTROY', defaultValue: '', description: 'Type DESTROY to confirm terraform destroy')
   }
 
@@ -103,3 +101,28 @@ pipeline {
           terraform destroy -input=false -auto-approve
         '''
       }
+    }
+  }
+
+  post {
+    always {
+      script {
+        if (fileExists('tfplan')) {
+          archiveArtifacts artifacts: 'tfplan', fingerprint: true, onlyIfSuccessful: false
+        }
+      }
+
+      echo 'sending build result!'
+      script {
+        def result = currentBuild.currentResult ?: "UNKNOWN"
+        def color  = COLOR_MAP.get(result, "#439FE0")
+
+        slackSend(
+          channel: "#wanderprep-infra-team",
+          color: color,
+          message: "Build done by luvy - ${env.JOB_NAME} #${env.BUILD_NUMBER} (ACTION=${params.ACTION}, RESULT=${result}) (<${env.BUILD_URL}|Open>)"
+        )
+      }
+    }
+  }
+}
