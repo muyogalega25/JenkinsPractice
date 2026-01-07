@@ -18,30 +18,20 @@ pipeline {
 
     stage('Terraform Init') {
       steps {
-        withCredentials([
-          string(credentialsId: 'jenkins-aws-secret-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-          string(credentialsId: 'jenkins-aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
-        ]) {
-          sh '''
-            export AWS_DEFAULT_REGION="$AWS_REGION"
-            terraform version
-            terraform init -input=false
-          '''
-        }
+        sh '''
+          export AWS_DEFAULT_REGION="$AWS_REGION"
+          terraform version
+          terraform init -input=false
+        '''
       }
     }
 
     stage('Terraform Plan') {
       steps {
-        withCredentials([
-          string(credentialsId: 'jenkins-aws-secret-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-          string(credentialsId: 'jenkins-aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
-        ]) {
-          sh '''
-            export AWS_DEFAULT_REGION="$AWS_REGION"
-            terraform plan -input=false -out=tfplan
-          '''
-        }
+        sh '''
+          export AWS_DEFAULT_REGION="$AWS_REGION"
+          terraform plan -input=false -out=tfplan
+        '''
       }
     }
 
@@ -60,30 +50,20 @@ pipeline {
     stage('Terraform Apply') {
       when { expression { params.ACTION == 'apply' } }
       steps {
-        withCredentials([
-          string(credentialsId: 'jenkins-aws-secret-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-          string(credentialsId: 'jenkins-aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
-        ]) {
-          sh '''
-            export AWS_DEFAULT_REGION="$AWS_REGION"
-            terraform apply -input=false -auto-approve tfplan
-          '''
-        }
+        sh '''
+          export AWS_DEFAULT_REGION="$AWS_REGION"
+          terraform apply -input=false -auto-approve tfplan
+        '''
       }
     }
 
     stage('Terraform Destroy') {
       when { expression { params.ACTION == 'destroy' } }
       steps {
-        withCredentials([
-          string(credentialsId: 'jenkins-aws-secret-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-          string(credentialsId: 'jenkins-aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
-        ]) {
-          sh '''
-            export AWS_DEFAULT_REGION="$AWS_REGION"
-            terraform destroy -input=false -auto-approve
-          '''
-        }
+        sh '''
+          export AWS_DEFAULT_REGION="$AWS_REGION"
+          terraform destroy -input=false -auto-approve
+        '''
       }
     }
   }
