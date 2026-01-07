@@ -13,14 +13,20 @@ provider "aws" {
   region = var.aws_region
 }
 
+data "aws_region" "current" {}
+
 locals {
   name_prefix = var.target_name
-  az          = "${var.aws_region}${var.availability_zone_suffix}"
+
+  # Safer AZ construction (works even if someone changes region var)
+  az = "${data.aws_region.current.name}${var.availability_zone_suffix}"
 
   common_tags = merge(
     var.tags,
     {
       NamePrefix = local.name_prefix
+      ManagedBy  = "Terraform"
+      Project    = "JenkinsPractice"
     }
   )
 }
@@ -82,6 +88,9 @@ resource "aws_route" "default" {
   route_table_id         = aws_route_table.public.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.this.id
+
+  # Make the dependency explicit to avoid timing edge cases
+  depends_on = [aws_internet_gateway.this]
 }
 
 resource "aws_route_table_association" "public" {
@@ -130,7 +139,6 @@ resource "aws_security_group" "target" {
 # IAM Role for Target EC2 (Optional)
 # NOTE: This role is for the target instance itself.
 # It does NOT grant Terraform permissions.
-# Keep it minimal unless the target instance needs AWS API access.
 # -------------------------
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
@@ -163,7 +171,7 @@ resource "aws_iam_instance_profile" "target_instance_profile" {
 }
 
 # -------------------------
-# Target EC2 Instance (created/destroyed by Terraform)
+# Target EC2 Instance
 # -------------------------
 resource "aws_instance" "target" {
   ami                    = data.aws_ami.al2023.id
@@ -177,7 +185,18 @@ resource "aws_instance" "target" {
   user_data                  = file("${path.module}/user_data.sh")
   user_data_replace_on_change = true
 
+  # IMDSv2 recommended
+  metadata_options {
+    http_tokens = "required"
+  }
+
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-ec2"
   })
+
+  # OPTIONAL safety net:
+  # Uncomment if you want to ensure this resource is never destroyed by accident
+  lifecycle {
+    prevent_destroy = true
+   }
 }
