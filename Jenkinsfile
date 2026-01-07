@@ -22,6 +22,7 @@ pipeline {
 
   environment {
     AWS_REGION       = 'us-east-2'
+    AWS_DEFAULT_REGION = 'us-east-2'
     TF_IN_AUTOMATION = 'true'
   }
 
@@ -32,11 +33,33 @@ pipeline {
       }
     }
 
+    // ---- IAM / AWS auth verification (fast fail) ----
+    stage('AWS Identity Check') {
+      steps {
+        sh '''
+          set -euo pipefail
+
+          echo "== AWS CLI version =="
+          aws --version
+
+          echo "== AWS credential source (debug) =="
+          # Shows whether it is using env vars, shared config, or instance profile
+          aws configure list || true
+
+          echo "== Caller identity (MUST succeed) =="
+          aws sts get-caller-identity
+
+          echo "== Region check =="
+          aws configure get region || true
+          echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"
+        '''
+      }
+    }
+
     stage('Terraform Init') {
       steps {
         sh '''
           set -euo pipefail
-          export AWS_DEFAULT_REGION="$AWS_REGION"
           terraform version
           terraform init -input=false
         '''
@@ -48,7 +71,6 @@ pipeline {
       steps {
         sh '''
           set -euo pipefail
-          export AWS_DEFAULT_REGION="$AWS_REGION"
           terraform plan -input=false -out=tfplan
           ls -lah tfplan
         '''
@@ -69,12 +91,23 @@ pipeline {
       }
     }
 
+    // Re-check IAM immediately before doing changes (catches expiring/removed creds)
+    stage('AWS Identity Re-Check (pre-apply/destroy)') {
+      when { expression { params.ACTION == 'apply' || params.ACTION == 'destroy' } }
+      steps {
+        sh '''
+          set -euo pipefail
+          echo "== Caller identity (pre-change) =="
+          aws sts get-caller-identity
+        '''
+      }
+    }
+
     stage('Terraform Apply') {
       when { expression { params.ACTION == 'apply' } }
       steps {
         sh '''
           set -euo pipefail
-          export AWS_DEFAULT_REGION="$AWS_REGION"
           terraform apply -input=false -auto-approve tfplan
         '''
       }
@@ -96,7 +129,6 @@ pipeline {
       steps {
         sh '''
           set -euo pipefail
-          export AWS_DEFAULT_REGION="$AWS_REGION"
           terraform destroy -input=false -auto-approve
         '''
       }
