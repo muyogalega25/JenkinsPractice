@@ -1,3 +1,10 @@
+def COLOR_MAP = [
+  "SUCCESS": "good",
+  "FAILURE": "danger",
+  "UNSTABLE": "warning",
+  "ABORTED": "#808080"
+]
+
 pipeline {
   agent any
 
@@ -69,47 +76,17 @@ pipeline {
   }
 
   post {
-    success {
-      withCredentials([string(credentialsId: 'slack-webhook-url', variable: 'SLACK_WEBHOOK')]) {
-        sh '''
-          set -e
-          payload=$(cat <<JSON
-{"text":"✅ Jenkins job *${JOB_NAME}* #${BUILD_NUMBER} succeeded. ACTION=${params.ACTION}"}
-JSON
-          )
+    always {
+      echo 'sending build result!'
+      script {
+        def result = currentBuild.currentResult ?: "UNKNOWN"
+        def color  = COLOR_MAP.get(result, "#439FE0") // default Slack blue
 
-          http_code=$(curl -s -o slack_resp.txt -w "%{http_code}" \
-            -X POST -H 'Content-type: application/json' \
-            --data "$payload" "$SLACK_WEBHOOK")
-
-          echo "Slack HTTP code: $http_code"
-          echo "Slack response:"
-          cat slack_resp.txt
-
-          test "$http_code" = "200"
-        '''
-      }
-    }
-
-    failure {
-      withCredentials([string(credentialsId: 'slack-webhook-url', variable: 'SLACK_WEBHOOK')]) {
-        sh '''
-          set -e
-          payload=$(cat <<JSON
-{"text":"❌ Jenkins job *${JOB_NAME}* #${BUILD_NUMBER} FAILED. ACTION=${params.ACTION}. Check console output."}
-JSON
-          )
-
-          http_code=$(curl -s -o slack_resp.txt -w "%{http_code}" \
-            -X POST -H 'Content-type: application/json' \
-            --data "$payload" "$SLACK_WEBHOOK")
-
-          echo "Slack HTTP code: $http_code"
-          echo "Slack response:"
-          cat slack_resp.txt
-
-          test "$http_code" = "200"
-        '''
+        slackSend(
+          channel: "#wanderprep-infra-team",
+          color: color,
+          message: "Build done by Mike - ${env.JOB_NAME} #${env.BUILD_NUMBER} (ACTION=${params.ACTION}, RESULT=${result}) (<${env.BUILD_URL}|Open>)"
+        )
       }
     }
   }
